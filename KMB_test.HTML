@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>九巴到站提示器 6.1 (終極修正版)</title>
+    <title>九巴到站提示器 6.2 (最新域名修正版)</title>
     <style>
         :root {
             --kmb-red: #E11B22;
@@ -45,7 +45,7 @@
 <body>
 
 <div class="container">
-    <h1>九巴到站提示器 6.1</h1>
+    <h1>九巴到站提示器 6.2</h1>
 
     <div class="config-box">
         <div class="input-group">
@@ -143,17 +143,15 @@
 
         statusText.innerText = "正在更新數據...";
         
-        const rawUrl = `https://etabus.gov.hk{stopId}/${route}/${bound}`;
+        // 🌟 核心修正：將原先失效的 .gov.hk 改成九巴官方最新啟用的 .com.hk 域名！
+        const rawUrl = `https://etabus.com.hk{stopId}/${route}/${bound}`;
         
-        // 🌟 這裡已進行了字元去空格與防錯處理，確保 100% 精準對接到您的 Cloudflare Worker
         const myProxy = "https://workers.dev".trim(); 
-        
         const url = `${myProxy}?url=${encodeURIComponent(rawUrl)}`;
 
         try {
             const response = await fetch(url);
             
-            // 如果連線成功但 Worker 回傳了程式碼層面的錯誤，印出具體狀態碼以利排查
             if (!response.ok) {
                 statusText.innerText = `Worker 回傳錯誤代碼: ${response.status}`;
                 return;
@@ -207,7 +205,7 @@
 
             statusText.innerText = `最後更新: ${now.toTimeString().substring(0, 8)}`;
         } catch (error) {
-            statusText.innerText = "連線失敗，請確認網頁已更新為 6.1 版";
+            statusText.innerText = "連線失敗，請檢查網路狀態";
         }
     }
 </script>
