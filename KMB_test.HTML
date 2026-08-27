@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>九巴到站提示器 5.0 終極解鎖版</title>
+    <style>
+        :root {
+            --kmb-red: #E11B22;
+            --dark-bg: #121212;
+            --card-bg: #1E1E1E;
+            --text-main: #FFFFFF;
+            --text-sub: #AAAAAA;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container { width: 100%; max-width: 500px; }
+        h1 { text-align: center; color: var(--kmb-red); font-size: 24px; margin-bottom: 20px; }
+        .config-box { background-color: var(--card-bg); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }
+        .input-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 5px; color: var(--text-sub); font-size: 14px; }
+        input, select { width: 100%; padding: 12px; box-sizing: border-box; background-color: #2D2D2D; border: 1px solid #444; color: white; border-radius: 5px; font-size: 16px; }
+        
+        button { width: 100%; padding: 14px; background-color: var(--kmb-red); color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        button:hover { background-color: #b81318; }
+        
+        .status-bar { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 15px; padding: 0 5px; }
+        .eta-list { display: flex; flex-direction: column; gap: 12px; }
+        .eta-card { background: linear-gradient(145deg, #222, #1a1a1a); border-left: 5px solid var(--kmb-red); padding: 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .route-num { font-size: 28px; font-weight: 900; }
+        .route-dest { font-size: 14px; color: var(--text-sub); }
+        .eta-time { font-size: 24px; font-weight: bold; color: #FFCC00; }
+        .eta-countdown { font-size: 12px; color: #00FFCC; text-align: right; }
+        .no-data { text-align: center; color: var(--text-sub); padding: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>九巴到站提示器 5.0</h1>
+
+    <div class="config-box">
+        <div class="input-group">
+            <label for="route">1. 巴士路線</label>
+            <input type="text" id="route" value="101" readonly style="background-color: #1a1a1a; color: #888; cursor: not-allowed;">
+        </div>
+        
+        <div class="input-group">
+            <label for="stopSelect">2. 選擇巴士站</label>
+            <select id="stopSelect">
+                <optgroup label="回程：往 觀塘（裕民坊）方向">
+                    <option value='{"stopId":"1FBF3DA8236B5F45","bound":"I"}' selected>第 11 站 - 林士街 (德輔道中金龍中心外)</option>
+                    <option value='{"stopId":"3E91FFDC3DA8FFBC","bound":"I"}'>第 12 站 - 德忌利士街</option>
+                    <option value='{"stopId":"A66FF2997C23F2DE","bound":"I"}'>第 13 站 - 怡和大廈</option>
+                    <option value='{"stopId":"83C90FF7A29CE226","bound":"I"}'>第 14 站 - 金鐘站</option>
+                    <option value='{"stopId":"AM06-T-1100-0","bound":"I"}'>第 17 站 - 紅磡海底隧道轉車站</option>
+                </optgroup>
+                <optgroup label="去程：往 堅尼地城 方向">
+                    <option value='{"stopId":"30FBE765691F610A","bound":"O"}'>第 1 站 - 觀塘（裕民坊）總站</option>
+                    <option value='{"stopId":"76B661AF58872013","bound":"O"}'>第 13 站 - 紅磡海底隧道轉車站</option>
+                </optgroup>
+            </select>
+        </div>
+
+        <button onclick="startMonitoring()">開始監測並啟用語音提示</button>
+    </div>
+
+    <div class="status-bar">
+        <span id="update-status">未開始監測</span>
+        <span id="next-refresh">--</span>
+    </div>
+
+    <div id="eta-container" class="eta-list">
+        <div class="no-data">已為您預設選中「林士街」，直接點擊上方紅色按鈕即可開始。</div>
+    </div>
+</div>
+
+<script>
+    let timerInterval = null;
+    let refreshCountdown = 30;
+    let hasAlerted = false;
+
+    function beep() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "sine"; osc.frequency.value = 800;
+        gain.gain.setValueAtTime(0.5, ctx.currentTime);
+        osc.start(); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.stop(ctx.currentTime + 0.3);
+    }
+
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-HK';
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function startMonitoring() {
+        const selectValue = document.getElementById('stopSelect').value;
+        if(!selectValue) {
+            alert("請先選取車站！");
+            return;
+        }
+
+        const stopConfig = JSON.parse(selectValue);
+        
+        beep(); 
+        speak("開始監測巴士時間");
+        
+        hasAlerted = false;
+        fetchETA(stopConfig.stopId, stopConfig.bound);
+        
+        if(timerInterval) clearInterval(timerInterval);
+        
+        refreshCountdown = 30;
+        timerInterval = setInterval(() => {
+            refreshCountdown--;
+            document.getElementById('next-refresh').innerText = `更新倒數: ${refreshCountdown}秒`;
+            
+            if(refreshCountdown <= 0) {
+                fetchETA(stopConfig.stopId, stopConfig.bound);
+                refreshCountdown = 30;
+            }
+        }, 1000);
+    }
+
+    async function fetchETA(stopId, bound) {
+        const route = "101";
+        const container = document.getElementById('eta-container');
+        const statusText = document.getElementById('update-status');
+
+        statusText.innerText = "正在更新數據...";
+        
+        // 🌟 核心修改：在原本九巴 API 前面疊加開源免費的 CORS 代理服務，一秒解鎖安全性限制！
+        const rawUrl = `https://etabus.gov.hk{stopId}/${route}/${bound}`;
+        const url = `https://herokuapp.com{rawUrl}`;
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const resData = await response.json();
+            
+            const etaList = (resData.data || [])
+                .filter(item => item.eta !== null)
+                .sort((a, b) => a.eta_seq - b.eta_seq);
+
+            if(etaList.length === 0) {
+                container.innerHTML = `<div class="no-data">目前沒有 ${route} 號線的到站預報。</div>`;
+                statusText.innerText = "更新完成（暫無班次）";
+                return;
+            }
+
+            container.innerHTML = "";
+            const now = new Date();
+
+            etaList.forEach((item, index) => {
+                const etaTime = new Date(item.eta);
+                const diffMs = etaTime - now;
+                const diffMins = Math.max(0, Math.floor(diffMs / 1000 / 60));
+
+                const card = document.createElement('div');
+                card.className = 'eta-card';
+                const timeString = etaTime.toTimeString().substring(0, 5);
+
+                card.innerHTML = `
+                    <div>
+                        <div class="route-num">${item.route}</div>
+                        <div class="route-dest">往 ${item.dest_tc}</div>
+                    </div>
+                    <div>
+                        <div class="eta-time">${timeString}</div>
+                        <div class="eta-countdown">${diffMins === 0 ? '即將到站' : `還有 ${diffMins} 分鐘`}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+
+                if (index === 0) {
+                    if (diffMins === 3 && !hasAlerted) {
+                        beep();
+                        setTimeout(() => { speak(`${item.route} 號巴士還有三分鍾到達。`); }, 500);
+                        hasAlerted = true;
+                    }
+                    if (diffMins > 3) { hasAlerted = false; }
+                }
+            });
+
+            statusText.innerText = `最後更新: ${now.toTimeString().substring(0, 8)}`;
+        } catch (error) {
+            statusText.innerText = "更新失敗（中轉連線超時）";
+        }
+    }
+</script>
+
+</body>
+</html>
