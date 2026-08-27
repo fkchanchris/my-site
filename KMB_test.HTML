@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>九巴到站提示器 7.0 (終極無敵版)</title>
+    <title>九巴到站提示器 7.1 (終極完美版)</title>
     <style>
         :root {
             --kmb-red: #E11B22;
@@ -45,7 +45,7 @@
 <body>
 
 <div class="container">
-    <h1>九巴到站提示器 7.0</h1>
+    <h1>九巴到站提示器 7.1</h1>
 
     <div class="config-box">
         <div class="input-group">
@@ -143,9 +143,10 @@
 
         statusText.innerText = "正在更新數據...";
         
-        // 🌟 採用雙向網域相容，並在網址最後加上時間戳記（Timestamp），強迫 Cloudflare 清除背景快取
+        // 1. 最新有效的九巴官方網域 (.com.hk) 加上防止快取快戳記
         const rawUrl = `https://etabus.com.hk{stopId}/${route}/${bound}?t=${Date.now()}`;
         
+        // 2. 您的專屬正確 Cloudflare Worker 通道網址 (已補齊完整前綴)
         const myProxy = "https://workers.dev"; 
         const url = `${myProxy}/?url=${encodeURIComponent(rawUrl)}`;
 
