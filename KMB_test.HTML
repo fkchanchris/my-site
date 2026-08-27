@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>九巴到站提示器 5.0 終極解鎖版</title>
+    <title>九巴到站提示器 6.0 (Cloudflare 終極免激活版)</title>
     <style>
         :root {
             --kmb-red: #E11B22;
@@ -45,7 +45,7 @@
 <body>
 
 <div class="container">
-    <h1>九巴到站提示器 5.0</h1>
+    <h1>九巴到站提示器 6.0</h1>
 
     <div class="config-box">
         <div class="input-group">
@@ -143,16 +143,15 @@
 
         statusText.innerText = "正在更新數據...";
         
-        // 🌟 核心修改：在原本九巴 API 前面疊加開源免費的 CORS 代理服務，一秒解鎖安全性限制！
         const rawUrl = `https://etabus.gov.hk{stopId}/${route}/${bound}`;
-        const url = `https://herokuapp.com{rawUrl}`;
+        
+        // 🌟 這裡已自動替換成您剛剛在微軟 Cloudflare 架設好的專屬永久網址
+        const myProxy = `https://workers.dev`; 
+        
+        const url = `${myProxy}?url=${encodeURIComponent(rawUrl)}`;
 
         try {
-            const response = await fetch(url, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
+            const response = await fetch(url);
             const resData = await response.json();
             
             const etaList = (resData.data || [])
@@ -201,7 +200,7 @@
 
             statusText.innerText = `最後更新: ${now.toTimeString().substring(0, 8)}`;
         } catch (error) {
-            statusText.innerText = "更新失敗（中轉連線超時）";
+            statusText.innerText = "更新失敗，請檢查 Worker 連線";
         }
     }
 </script>
